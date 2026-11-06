@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据分析报告 · data-report-pro</title>
+<!-- 文本和表格可离线；图表依赖 CDN，离线时明确显示不可用。 -->
+<script id="chart-library" defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f7f6f3;
+    --paper:#ffffff;
+    --ink:#1a1a1a;
+    --ink-soft:#5c5c5c;
+    --ink-faint:#707070;
+    --line:#e6e3dd;
+    --accent:#1f3a5f;        /* 强调色：沉稳深蓝 */
+    --accent-soft:#e8eef5;
+    --good:#2f7d5b;          /* 正向 */
+    --bad:#b23b3b;           /* 负向 */
+    --warn:#b8860b;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:64px 28px 96px;}
+
+  /* ---- 标题区 ---- */
+  .masthead{border-bottom:3px solid var(--ink);padding-bottom:28px;margin-bottom:44px;}
+  .kicker{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .headline{font-size:34px;line-height:1.25;font-weight:800;margin:14px 0 16px;letter-spacing:-.01em;}
+  .summary{font-size:18px;color:var(--ink-soft);max-width:62ch;}
+  .meta{margin-top:18px;font-size:13px;color:var(--ink-faint);display:flex;gap:22px;flex-wrap:wrap;}
+  .meta b{color:var(--ink);font-weight:600;}
+
+  /* ---- 区块标题 ---- */
+  .section{margin:56px 0 0;}
+  .section-eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:8px;}
+  .section-title{font-size:22px;font-weight:800;margin-bottom:24px;letter-spacing:-.01em;}
+
+  /* ---- KPI 卡片行 ---- */
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px 20px;box-shadow:var(--shadow);}
+  .kpi .label{font-size:13px;color:var(--ink-faint);font-weight:600;}
+  .kpi .value{font-size:32px;font-weight:800;margin:6px 0 4px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+  .kpi .delta{font-size:13px;font-weight:600;}
+  .kpi .delta.up{color:var(--good);}
+  .kpi .delta.down{color:var(--bad);}
+  .kpi .delta.flat{color:var(--ink-faint);}
+
+  /* ---- 发现卡片 ---- */
+  .finding{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:30px 28px;box-shadow:var(--shadow);margin-bottom:26px;}
+  .finding-rank{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.1em;}
+  .finding-title{font-size:21px;font-weight:800;line-height:1.35;margin:6px 0 14px;letter-spacing:-.01em;}
+  .finding-body{color:var(--ink-soft);font-size:15.5px;margin-bottom:8px;}
+  .sowhat{margin-top:14px;padding:14px 16px;background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:15px;}
+  .sowhat b{color:var(--accent);}
+  .chart-box{margin-top:22px;position:relative;height:300px;}
+
+  /* ---- 关注列表 ---- */
+  .watch{background:#fff8ec;border:1px solid #f0e3c6;border-radius:12px;padding:22px 24px;}
+  .watch ul{list-style:none;}
+  .watch li{padding:8px 0 8px 26px;position:relative;color:var(--ink-soft);font-size:15px;}
+  .watch li::before{content:"⚑";position:absolute;left:0;color:var(--warn);}
+
+  /* ---- 建议 ---- */
+  .recs{counter-reset:rec;}
+  .rec{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);}
+  .rec:last-child{border-bottom:none;}
+  .rec .num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
+  .rec .txt{font-size:15.5px;color:var(--ink);}
+  .rec .txt small{display:block;color:var(--ink-faint);font-size:13px;margin-top:3px;}
+
+  /* ---- 数据表 ---- */
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th,td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+  th{background:#fafafa;font-weight:700;color:var(--ink-soft);font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;position:sticky;top:0;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.neg{color:var(--bad);font-weight:600;}
+  td.pos{color:var(--good);font-weight:600;}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-faint);text-align:center;}
+  @media(max-width:600px){.headline{font-size:26px;}.kpi .value{font-size:26px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ 标题区 ============ -->
+  <header class="masthead">
+    <div class="kicker" id="r-kicker">数据分析报告</div>
+    <h1 class="headline" id="r-headline">报告主标题（写一句话摘要式结论）</h1>
+    <p class="summary" id="r-summary">一句话摘要：整份数据最重要的一个结论写在这里。</p>
+    <div class="meta">
+      <span>数据：<b id="m-source">—</b></span>
+      <span>规模：<b id="m-rows">—</b></span>
+      <span>时间段：<b id="m-period">—</b></span>
+      <span>生成：<b id="m-date">—</b></span>
+    </div>
+  </header>
+
+  <!-- ============ 数据全貌 / KPI ============ -->
+  <section class="section">
+    <div class="section-eyebrow">数据全貌</div>
+    <h2 class="section-title">核心指标总览</h2>
+    <div class="kpi-row" id="kpi-row"></div>
+  </section>
+
+  <!-- ============ 核心发现 ============ -->
+  <section class="section">
+    <div class="section-eyebrow">核心发现</div>
+    <h2 class="section-title">按重要性排序的关键结论</h2>
+    <div id="findings"></div>
+  </section>
+
+  <!-- ============ 值得关注 ============ -->
+  <section class="section">
+    <div class="section-eyebrow">值得关注</div>
+    <h2 class="section-title">数据质量与风险提示</h2>
+    <div class="watch"><ul id="watch-list"></ul></div>
+  </section>
+
+  <!-- ============ 建议 ============ -->
+  <section class="section">
+    <div class="section-eyebrow">行动建议</div>
+    <h2 class="section-title">基于发现的可执行行动项</h2>
+    <div class="recs" id="recs"></div>
+  </section>
+
+  <!-- ============ 明细数据表 ============ -->
+  <section class="section">
+    <div class="section-eyebrow">附录</div>
+    <h2 class="section-title">明细数据</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="tbl-head"></tr></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>由 data-report-pro 生成 · 报告数据内嵌；文本与表格可离线，图表需联网。分析过程的传输与留存取决于宿主平台</footer>
+</div>
+
+<script id="report-data" type="application/json">
+{
+  "meta": {
+    "kicker": "投放数据复盘 · 2026 Q2",
+    "headline": "信息流吃掉 36% 预算，ROI 仅 1.12，低于盈亏线，建议削减并转投搜索",
+    "summary": "本期 6 个渠道整体 ROI 1.79，低于盈亏线 2.0。信息流的 ROI 最低，而搜索的 ROI 达 3.10、只占 10% 预算，仍有放量空间。",
+    "source": "campaign-data-sample.csv",
+    "rows": "28 行 · 7 列",
+    "period": "2026-04 ~ 2026-06",
+    "date": "2026-06-13"
+  },
+  "kpis": [
+    {
+      "label": "总消耗",
+      "value": "¥299,700",
+      "delta": "共 28 笔投放",
+      "dir": "flat"
+    },
+    {
+      "label": "总 GMV",
+      "value": "¥536,845",
+      "delta": "含未剔除的退货金额",
+      "dir": "flat"
+    },
+    {
+      "label": "整体 ROI",
+      "value": "1.79",
+      "delta": "低于盈亏线 2.0",
+      "dir": "down"
+    },
+    {
+      "label": "平均退货率",
+      "value": "13.0%",
+      "delta": "高于预警线 12%",
+      "dir": "down"
+    }
+  ],
+  "findings": [
+    {
+      "rank": "发现 1 · 最高优先级",
+      "title": "信息流 ROI 仅 1.12，是拖累整体 ROI 的主因",
+      "body": "信息流消耗 ¥109,300（占 36%），ROI 只有 1.12，低于盈亏线 2.0。按盈亏线算，这些消耗应产出 ¥218,600 GMV，实际 ¥122,735，缺口 ¥95,865，占所有低于盈亏线渠道缺口的 82%。其余低于盈亏线的渠道：短视频 ROI 1.68，缺口 ¥21,715。",
+      "sowhat": "该渠道每投入 1 元只换回 ¥1.12 GMV。建议本周内把信息流预算削减约一半（约 ¥54,650），再观察整体 ROI 是否向盈亏线靠近。",
+      "chart": {
+        "type": "bar",
+        "title": "各渠道 ROI（盈亏线参考值 2.0）",
+        "labels": [
+          "信息流",
+          "短视频",
+          "社交",
+          "展示",
+          "邮件",
+          "搜索"
+        ],
+        "datasets": [
+          {
+            "label": "ROI",
+            "data": [
+              1.12,
+              1.68,
+              2.08,
+              2.3,
+              2.6,
+              3.1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "rank": "发现 2",
+      "title": "整体 ROI 逐月走低：4 月 1.86 → 5 月 1.80 → 6 月 1.67",
+      "body": "整体 ROI 由 1.86 降到 1.67，约降 10%（6 月只到 13 日）。同期信息流（1.20→1.10）、短视频（1.70→1.65）、社交（2.10→2.05）自身的 ROI 也在走低，其余 3 个渠道持平，没有渠道回升。",
+      "sowhat": "趋势比单点更值得警惕：若继续走低，整体 ROI 会离盈亏线 2.0 越来越远。先排查是创意疲劳还是竞价环境变化，再决定是否加预算。",
+      "chart": {
+        "type": "line",
+        "title": "整体 ROI 逐月走势",
+        "labels": [
+          "2026-04",
+          "2026-05",
+          "2026-06（截至 13 日）"
+        ],
+        "datasets": [
+          {
+            "label": "整体 ROI",
+            "data": [
+              1.86,
+              1.8,
+              1.67
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "rank": "发现 3",
+      "title": "预算分配与产出错配",
+      "body": "信息流与短视频合计拿走 59% 预算，只贡献 44% GMV；搜索只占 10% 预算，却贡献 18% GMV。",
+      "sowhat": "预算应从低效渠道向搜索倾斜。理论上把信息流预算的一半（¥54,650）转投搜索，整体 ROI 可由 1.79 升到约 2.15；这假设搜索的 ROI 3.10 在放量后不下降，实际通常会下降，宜分步试投。",
+      "chart": {
+        "type": "doughnut",
+        "title": "预算分配占比",
+        "labels": [
+          "信息流",
+          "短视频",
+          "社交",
+          "展示",
+          "邮件",
+          "搜索"
+        ],
+        "datasets": [
+          {
+            "label": "消耗",
+            "data": [
+              109300,
+              68100,
+              48600,
+              29100,
+              13300,
+              31300
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "rank": "发现 4",
+      "title": "消耗越高的投放，退货率越高（相关 r=0.99）",
+      "body": "26 笔有退货率的投放里，单笔消耗与退货率强正相关。消耗最高的 5 笔全部来自信息流，该渠道平均退货率 19%，高于整体的 13% 和预警线 12%。",
+      "sowhat": "相关不等于因果：高消耗和高退货率可能都来自渠道本身，而不是消耗拉高了退货。建议先按渠道分层核对退货率，再判断冲量是否拉低了流量质量。",
+      "chart": {
+        "type": "scatter",
+        "title": "单次投放消耗 vs 退货率（%）",
+        "xTitle": "消耗(元)",
+        "yTitle": "退货率(%)",
+        "datasets": [
+          {
+            "label": "投放",
+            "data": [
+              {
+                "x": 5200,
+                "y": 8.0
+              },
+              {
+                "x": 8100,
+                "y": 11.0
+              },
+              {
+                "x": 12400,
+                "y": 15.0
+              },
+              {
+                "x": 15600,
+                "y": 18.0
+              },
+              {
+                "x": 6700,
+                "y": 10.0
+              },
+              {
+                "x": 4300,
+                "y": 8.0
+              },
+              {
+                "x": 6100,
+                "y": 9.0
+              },
+              {
+                "x": 9800,
+                "y": 12.0
+              },
+              {
+                "x": 14200,
+                "y": 16.0
+              },
+              {
+                "x": 18900,
+                "y": 19.0
+              },
+              {
+                "x": 7400,
+                "y": 10.0
+              },
+              {
+                "x": 7300,
+                "y": 9.0
+              },
+              {
+                "x": 11200,
+                "y": 13.0
+              },
+              {
+                "x": 15800,
+                "y": 17.0
+              },
+              {
+                "x": 21300,
+                "y": 21.0
+              },
+              {
+                "x": 5200,
+                "y": 8.0
+              },
+              {
+                "x": 6800,
+                "y": 10.0
+              },
+              {
+                "x": 13600,
+                "y": 15.0
+              },
+              {
+                "x": 19800,
+                "y": 20.0
+              },
+              {
+                "x": 10400,
+                "y": 12.0
+              },
+              {
+                "x": 5900,
+                "y": 9.0
+              },
+              {
+                "x": 12100,
+                "y": 14.0
+              },
+              {
+                "x": 17500,
+                "y": 18.0
+              },
+              {
+                "x": 9100,
+                "y": 11.0
+              },
+              {
+                "x": 3800,
+                "y": 7.0
+              },
+              {
+                "x": 16200,
+                "y": 19.0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "watch": [
+    "退货率列有 2 行缺失（CSV 第 17、26 行，行号含表头，占 7%），平均退货率 13.0% 是剔除缺失后按 26 行计算的，未补值。",
+    "「邮件」渠道仅 3 笔投放，样本过小，其 ROI 2.60 的结论需更多数据验证。",
+    "6 月数据只到 2026-06-13，逐月 ROI 里的 6 月是不完整月份，趋势需下月数据确认。",
+    "GMV 含未剔除的退货金额，净 GMV 会更低，盈亏判断偏乐观。",
+    "盈亏线 2.0 与退货预警线 12% 是行业经验线（见 references/domain-knowledge.md），不是这份数据给出的，实际请以贵方毛利和目标为准。"
+  ],
+  "recs": [
+    {
+      "t": "本周内将信息流预算削减 50%",
+      "note": "信息流 ROI 1.12 低于盈亏线 2.0，约 ¥54,650 预算可重新分配"
+    },
+    {
+      "t": "把削减的预算分步转投搜索",
+      "note": "搜索 ROI 3.10 为各渠道最高且仅占 10% 预算，放量后盯住 ROI 是否下降"
+    },
+    {
+      "t": "排查整体 ROI 逐月走低的根因（创意疲劳 / 竞价）",
+      "note": "4 月 1.86 → 6 月 1.67，加预算前先定位"
+    },
+    {
+      "t": "对高消耗投放做退货归因",
+      "note": "消耗与退货率相关 r=0.99，先按渠道分层，验证冲量是否拉低流量质量"
+    }
+  ],
+  "table": {
+    "head": [
+      "板块",
+      "渠道",
+      "消耗(元)",
+      "GMV(元)",
+      "ROI",
+      "退货率"
+    ],
+    "rows": [
+      [
+        "A板块",
+        "搜索",
+        "31300",
+        "97030",
+        "3.10",
+        "9%"
+      ],
+      [
+        "B板块",
+        "社交",
+        "48600",
+        "101085",
+        "2.08",
+        "12%"
+      ],
+      [
+        "C板块",
+        "短视频",
+        "68100",
+        "114485",
+        "1.68",
+        "15%",
+        "neg"
+      ],
+      [
+        "D板块",
+        "信息流",
+        "109300",
+        "122735",
+        "1.12",
+        "19%",
+        "neg"
+      ],
+      [
+        "E板块",
+        "展示",
+        "29100",
+        "66930",
+        "2.30",
+        "10%"
+      ],
+      [
+        "F板块",
+        "邮件",
+        "13300",
+        "34580",
+        "2.60",
+        "8%"
+      ]
+    ]
+  }
+}
+</script>
+<script>
+const DATA = JSON.parse(document.getElementById("report-data").textContent);
+
+/* ===================== 渲染逻辑（一般无需改动） ===================== */
+const $ = id => document.getElementById(id);
+const PALETTE = ["#1f3a5f","#3a6ea5","#6fa3d2","#9cc3e6","#c8def0","#e8eef5"];
+// Runtime chart tokens. Keep single-series appearance stable; series colors come from PALETTE.
+const CHART_THEME = {
+  lineFill:"rgba(31,58,95,.12)", ink:"#1a1a1a", grid:"#eee",
+  borderWidth:2, lineTension:.3, pointRadius:3, scatterRadius:5,
+  titleFont:{size:14,weight:"600"}, titlePadding:{bottom:14}
+};
+
+function renderMeta(){
+  $("r-kicker").textContent = DATA.meta.kicker;
+  $("r-headline").textContent = DATA.meta.headline;
+  $("r-summary").textContent = "一句话摘要：" + DATA.meta.summary;
+  $("m-source").textContent = DATA.meta.source;
+  $("m-rows").textContent = DATA.meta.rows;
+  $("m-period").textContent = DATA.meta.period;
+  $("m-date").textContent = DATA.meta.date;
+  document.title = DATA.meta.headline;
+}
+function el(tag, className, text){
+  const node = document.createElement(tag);
+  if(className) node.className = className;
+  if(text !== undefined && text !== null) node.textContent = String(text);
+  return node;
+}
+function renderKpis(){
+  $("kpi-row").replaceChildren(...DATA.kpis.map(k=>{
+    const card=el("div","kpi");
+    const dir=["up","down","flat"].includes(k.dir)?k.dir:"";
+    card.append(el("div","label",k.label),el("div","value",k.value),el("div","delta "+dir,k.delta));
+    return card;
+  }));
+}
+function renderWatch(){
+  $("watch-list").replaceChildren(...DATA.watch.map(w=>el("li","",w)));
+}
+function renderRecs(){
+  $("recs").replaceChildren(...DATA.recs.map((r,i)=>{
+    const card=el("div","rec"),text=el("div","txt",r.t);
+    text.append(el("small","",r.note||""));card.append(el("div","num",i+1),text);return card;
+  }));
+}
+function renderTable(){
+  $("tbl-head").replaceChildren(...DATA.table.head.map(h=>el("th","",h)));
+  $("tbl-body").replaceChildren(...DATA.table.rows.map(row=>{
+    const flag=row.length>DATA.table.head.length?row[row.length-1]:null;
+    const cells=row.slice(0,DATA.table.head.length),tr=el("tr");
+    tr.append(...cells.map((c,i)=>el("td",i===cells.length-2&&flag==="neg"?"neg":"",c)));
+    return tr;
+  }));
+}
+function chartDataTable(c){
+  const details=el("details","table-wrap"),table=el("table"),head=el("thead"),body=el("tbody"),header=el("tr");
+  const headings=c.type==="scatter" ? ["数据集",c.xTitle||"X",c.yTitle||"Y"] : ["类别",...c.datasets.map(d=>d.label)];
+  headings.forEach(label=>{
+    const cell=el("th","",label);cell.setAttribute("scope","col");header.append(cell);
+  });
+  head.append(header);
+  const rows=c.type==="scatter"
+    ? c.datasets.flatMap(d=>d.data.map(p=>[d.label,p.x,p.y]))
+    : c.labels.map((label,i)=>[label,...c.datasets.map(d=>d.data[i])]);
+  rows.forEach(values=>{
+    const row=el("tr");row.append(...values.map(value=>el("td","",value)));body.append(row);
+  });
+  table.append(el("caption","",c.title),head,body);
+  details.append(el("summary","","查看图表数据"),table);
+  return details;
+}
+function chartCanvas(c,i){
+  const canvas=el("canvas");canvas.id="chart-"+i;
+  canvas.setAttribute("role","img");canvas.setAttribute("aria-label",c.title);
+  return canvas;
+}
+function renderFindings(){
+  $("findings").replaceChildren(...DATA.findings.map((f,i)=>{
+    const card=el("div","finding"),so=el("div","sowhat"),box=el("div","chart-box");
+    so.append(el("b","","So What："),document.createTextNode(String(f.sowhat??"")));
+    box.append(chartCanvas(f.chart,i));
+    card.append(el("div","finding-rank",f.rank),el("div","finding-title",f.title),el("div","finding-body",f.body),so,box,chartDataTable(f.chart));
+    return card;
+  }));
+}
+function drawCharts(){
+  DATA.findings.forEach((f,i)=>{
+    const c = f.chart;
+    if(!c || !["bar","line","doughnut","scatter"].includes(c.type)) return;
+    const multiple = c.datasets.length > 1;
+    const ds = c.datasets.map((d,di)=>{
+      const color = PALETTE[(multiple ? di : c.type==="scatter" ? 1 : 0)%PALETTE.length];
+      const base = {
+        label:d.label, data:d.data,
+        backgroundColor: c.type==="line" ? (multiple ? color : CHART_THEME.lineFill)
+          : c.type==="scatter" ? color
+          : !multiple || c.type==="doughnut" ? c.labels.map((_,k)=>PALETTE[k%PALETTE.length]) : color,
+        borderColor:multiple?color:PALETTE[0], borderWidth:CHART_THEME.borderWidth,
+        tension: c.type==="line"?CHART_THEME.lineTension:0, fill:c.type==="line"&&!multiple,
+        pointRadius: c.type==="scatter"?CHART_THEME.scatterRadius:CHART_THEME.pointRadius
+      };
+      return base;
+    });
+    const cfg = {
+      type:c.type,
+      data:{ labels:c.labels, datasets:ds },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:(c.type==="doughnut" || multiple)},
+          title:{display:true,text:c.title,font:CHART_THEME.titleFont,color:CHART_THEME.ink,padding:CHART_THEME.titlePadding}
+        },
+        scales: (c.type==="doughnut") ? {} : {
+          y:{ beginAtZero:true, grid:{color:CHART_THEME.grid},
+              title: c.yTitle?{display:true,text:c.yTitle}:undefined },
+          x:{ grid:{display:false},
+              title: c.xTitle?{display:true,text:c.xTitle}:undefined }
+        }
+      }
+    };
+    const canvas = document.getElementById("chart-"+i);
+    try {
+      new Chart(canvas, cfg);
+    } catch {
+      // A plugin/runtime error must not blank subsequent charts or expose raw error details.
+      try { Chart.getChart(canvas)?.destroy(); } catch {}
+      document.querySelectorAll(".chart-box")[i].replaceChildren(el("p","","图表暂时无法显示；请先查看报告文本与明细数据"));
+    }
+  });
+}
+
+renderMeta(); renderKpis(); renderFindings(); renderWatch(); renderRecs(); renderTable();
+if(window.Chart){ drawCharts(); }
+else{
+  document.querySelectorAll(".chart-box").forEach(b=>b.replaceChildren(el("p","","图表需联网加载 Chart.js；文本与表格可离线查看")));
+  // A deferred CDN request must not prevent the report text and data tables from rendering.
+  $("chart-library").addEventListener("load",()=>{
+    if(window.Chart){
+      document.querySelectorAll(".chart-box").forEach((box,i)=>box.replaceChildren(chartCanvas(DATA.findings[i].chart,i)));
+      drawCharts();
+    }
+  },{once:true});
+}
+</script>
+</body>
+</html>
