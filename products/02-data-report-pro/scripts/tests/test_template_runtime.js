@@ -156,6 +156,19 @@ test('the chart library cannot block parsing the report body', () => {
   assert.match(html, /<script\b(?=[^>]*\bid="chart-library")(?=[^>]*\bdefer\b)[^>]*\bsrc="https:\/\/cdn\.jsdelivr\.net\//);
 });
 
+test('external scripts require verified integrity and anonymous CORS', () => {
+  const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="[^"]+"[^>]*>/g)];
+  assert.equal(scripts.length, 1);
+  for (const [tag] of scripts) {
+    const attrs = Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)]
+      .map(([, name, value]) => [name, value]));
+    assert.equal(attrs.src, 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js');
+    // SHA-384 of the npm-published artifact, not jsDelivr's dynamic .min.js alias.
+    assert.equal(attrs.integrity, 'sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG');
+    assert.equal(attrs.crossorigin, 'anonymous');
+  }
+});
+
 test('a delayed chart library draws charts after the report text is already available', () => {
   const {document, charts, all, finishLoad} = render(example, false);
   assert.equal(document.getElementById('r-headline').textContent, example.meta.headline);
